@@ -4,3 +4,7 @@
 *.log
 *~
 .devcontainer/
+.history/
+
+# Built widget package (produced by package.sh / CI)
+*.plasmoid
