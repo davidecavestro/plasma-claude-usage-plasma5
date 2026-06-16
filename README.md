@@ -1,6 +1,15 @@
-# Claude Usage Widget
+# Claude Usage Widget (Plasma 5 port)
 
-A KDE Plasma 6 widget that displays your Claude Code usage statistics in the taskbar.
+A KDE Plasma 5 widget that displays your Claude Code usage statistics in the taskbar.
+
+> **This is a Plasma 5 port** of the original Plasma 6 widget by **izll** —
+> [izll/plasma-claude-usage](https://github.com/izll/plasma-claude-usage).
+> It has been adapted for KDE Plasma 5 (KF5 / Qt 5.15): unversioned QML imports were
+> pinned, `Plasma5Support.DataSource` was replaced with `PlasmaCore.DataSource`,
+> the root became a plain `Item` with `Plasmoid.`-attached representations, the config
+> page uses `org.kde.kcm`, and metadata moved from `metadata.json` to `metadata.desktop`.
+> The port was carried out with AI assistance.
+> For Plasma 6, use the upstream repository instead.
 
 ![Popup](screenshots/popup.png)
 
@@ -25,31 +34,32 @@ A KDE Plasma 6 widget that displays your Claude Code usage statistics in the tas
 
 ## Requirements
 
-- KDE Plasma 6.0 or later
+- KDE Plasma 5 (tested on 5.27 / KF5 5.115 / Qt 5.15)
 - Claude Code CLI installed and logged in
+
+> For KDE Plasma 6, use the original widget: <https://github.com/izll/plasma-claude-usage>
 
 ## Installation
 
-### From KDE Store
+### Quick install (script)
 
-1. Right-click on your panel
-2. Select "Add Widgets..."
-3. Click "Get New Widgets..." > "Download New Plasma Widgets..."
-4. Search for "Claude Usage"
-5. Click Install
+```bash
+./install.sh
+kquitapp5 plasmashell && kstart5 plasmashell
+```
 
 ### Manual Installation
 
 ```bash
-kpackagetool6 -t Plasma/Applet -i claude-usage-widget.plasmoid
+kpackagetool5 -t Plasma/Applet -i claude-usage-widget.plasmoid
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/izll/plasma-claude-usage.git
-cd claude-usage-widget
-kpackagetool6 -t Plasma/Applet -i .
+git clone https://github.com/davidecavestro/plasma-claude-usage-plasma5.git   # this Plasma 5 port
+cd plasma-claude-usage-plasma5
+kpackagetool5 -t Plasma/Applet -i .
 ```
 
 ## Usage
@@ -134,7 +144,7 @@ The base URL in the widget settings doesn't point to a valid API. Make sure you'
 
 ```
 claude-usage-widget/
-├── metadata.json           # Widget metadata
+├── metadata.desktop        # Widget metadata (Plasma 5, INI format)
 ├── install.sh              # Installation script
 ├── contents/
 │   ├── config/
@@ -152,11 +162,19 @@ claude-usage-widget/
 
 GPL-3.0-or-later
 
-## Author
+## Credits
 
-izll
+- **Original author / upstream project:** izll — <https://github.com/izll/plasma-claude-usage> (KDE Plasma 6)
+- **Plasma 5 port:** adapted from the upstream widget for KDE Plasma 5 (KF5 / Qt 5.15), with AI assistance
 
 ## Version History
+
+### Plasma 5 port
+- Ported the upstream Plasma 6 widget to KDE Plasma 5 (KF5 / Qt 5.15)
+- Versioned QML imports; `Plasma5Support.DataSource` → `PlasmaCore.DataSource`
+- Root `PlasmoidItem` → `Item` with `Plasmoid.compactRepresentation` / `Plasmoid.fullRepresentation`
+- Config page imports `org.kde.kcm` (KF5 home of `SimpleKCM`)
+- Metadata moved from `metadata.json` to `metadata.desktop`
 
 ### 1.3.6 (2026)
 - Vertical layout option for taller panels (thanks @nahall, issue #5)

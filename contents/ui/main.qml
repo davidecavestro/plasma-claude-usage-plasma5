@@ -1,12 +1,11 @@
-import QtQuick
-import QtQuick.Layouts
-import org.kde.plasma.plasmoid
-import org.kde.plasma.components as PlasmaComponents
-import org.kde.kirigami as Kirigami
-import org.kde.plasma.plasma5support as Plasma5Support
-import org.kde.plasma.core as PlasmaCore
+import QtQuick 2.15
+import QtQuick.Layouts 1.15
+import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.components 3.0 as PlasmaComponents
+import org.kde.kirigami 2.20 as Kirigami
+import org.kde.plasma.core 2.0 as PlasmaCore
 
-PlasmoidItem {
+Item {
     id: root
 
     // Translations
@@ -46,7 +45,7 @@ PlasmoidItem {
         : Math.max(Plasmoid.configuration.refreshInterval || 1, 1) * 60000 * 3
 
     // Cache writer - saves last successful data to file
-    Plasma5Support.DataSource {
+    PlasmaCore.DataSource {
         id: cacheWriter
         engine: "executable"
         connectedSources: []
@@ -54,7 +53,7 @@ PlasmoidItem {
     }
 
     // Cache reader - loads cached data on startup
-    Plasma5Support.DataSource {
+    PlasmaCore.DataSource {
         id: cacheReader
         engine: "executable"
         connectedSources: []
@@ -125,7 +124,7 @@ PlasmoidItem {
     }
 
     // Token watcher - polls credentials file during rate limit to detect token refresh
-    Plasma5Support.DataSource {
+    PlasmaCore.DataSource {
         id: tokenWatcher
         engine: "executable"
         connectedSources: []
@@ -163,7 +162,7 @@ PlasmoidItem {
     }
 
     // Data source for reading credentials file
-    Plasma5Support.DataSource {
+    PlasmaCore.DataSource {
         id: fileReader
         engine: "executable"
         connectedSources: []
@@ -214,7 +213,7 @@ PlasmoidItem {
     property string claudeVersion: ""
     property string userAgent: "claude-code/" + Qt.formatDateTime(new Date(), "yyyy.M.d")
 
-    Plasma5Support.DataSource {
+    PlasmaCore.DataSource {
         id: versionReader
         engine: "executable"
         connectedSources: []
@@ -233,7 +232,7 @@ PlasmoidItem {
     }
 
     // Data source for launching claude in terminal
-    Plasma5Support.DataSource {
+    PlasmaCore.DataSource {
         id: claudeLauncher
         engine: "executable"
         connectedSources: []
@@ -381,7 +380,7 @@ PlasmoidItem {
     // Compact representation (panel)
     readonly property bool isVerticalLayout: Plasmoid.configuration.panelLayout === "vertical"
 
-    compactRepresentation: Item {
+    Plasmoid.compactRepresentation: Item {
         Layout.minimumWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
         Layout.minimumHeight: root.isVerticalLayout ? usageRow.implicitHeight + Kirigami.Units.largeSpacing * 2 : Kirigami.Units.iconSizes.medium
         Layout.preferredWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
@@ -389,7 +388,7 @@ PlasmoidItem {
 
         MouseArea {
             anchors.fill: parent
-            onClicked: root.expanded = !root.expanded
+            onClicked: Plasmoid.expanded = !Plasmoid.expanded
         }
 
         GridLayout {
@@ -699,7 +698,7 @@ PlasmoidItem {
     }
 
     // Full representation (popup)
-    fullRepresentation: Item {
+    Plasmoid.fullRepresentation: Item {
         Layout.minimumWidth: Kirigami.Units.gridUnit * 14
         Layout.minimumHeight: Kirigami.Units.gridUnit * 16
         Layout.preferredWidth: Kirigami.Units.gridUnit * 16
@@ -1115,7 +1114,7 @@ PlasmoidItem {
     }
 
     // Install icon to system theme for about page
-    Plasma5Support.DataSource {
+    PlasmaCore.DataSource {
         id: iconInstaller
         engine: "executable"
         connectedSources: []
@@ -1145,12 +1144,11 @@ PlasmoidItem {
         anchors.fill: parent
         color: Kirigami.Theme.backgroundColor
         opacity: Plasmoid.configuration.backgroundOpacity
-        radius: Kirigami.Units.cornerRadius
+        radius: Kirigami.Units.smallSpacing
     }
 
-    Plasmoid.icon: "claude-usage-widget"
-    toolTipMainText: i18n.tr("Claude Usage")
-    toolTipSubText: {
+    Plasmoid.toolTipMainText: i18n.tr("Claude Usage")
+    Plasmoid.toolTipSubText: {
         var parts = []
         if (Plasmoid.configuration.showSession !== false)
             parts.push(i18n.tr("Session (5hr)") + ": " + Math.round(root.sessionUsagePercent) + "%")
