@@ -580,7 +580,33 @@ Item {
             PlasmaComponents.Label {
                 visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showSonnet === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
                 text: Math.round(root.sonnetWeeklyPercent) + "%"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+                font.pixelSize: compactRoot.labelFont
+                font.bold: true
+                opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
+            }
+
+            // Separator before opus (text)
+            PlasmaComponents.Label {
+                visible: !root.isVerticalLayout && (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showOpus === true) && ((Plasmoid.configuration.showSession !== false) || (Plasmoid.configuration.showWeekly !== false) || (Plasmoid.configuration.showSonnet === true)) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
+                text: "|"
+                opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.25 : root.isStale ? 0.35 : 0.5
+                font.pixelSize: compactRoot.labelFont
+            }
+
+            // Opus usage (text)
+            Rectangle {
+                visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showOpus === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
+                Layout.preferredWidth: compactRoot.dotSize
+                Layout.preferredHeight: compactRoot.dotSize
+                radius: compactRoot.dotSize / 2
+                color: getUsageColor(root.opusWeeklyPercent)
+                opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
+            }
+
+            PlasmaComponents.Label {
+                visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showOpus === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
+                text: Math.round(root.opusWeeklyPercent) + "%"
+                font.pixelSize: compactRoot.labelFont
                 font.bold: true
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
             }
@@ -666,7 +692,35 @@ Item {
                 PlasmaComponents.Label {
                     anchors.centerIn: parent
                     text: Math.round(root.sonnetWeeklyPercent)
-                    font.pixelSize: 9
+                    font.pixelSize: compactRoot.glyphFont
+                    font.bold: true
+                }
+            }
+
+            // Opus (circular)
+            Item {
+                visible: Plasmoid.configuration.panelStyle === "circular" && (Plasmoid.configuration.showOpus === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
+                Layout.preferredWidth: compactRoot.ringSize
+                Layout.preferredHeight: compactRoot.ringSize
+                opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
+
+                Canvas {
+                    anchors.fill: parent
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        drawCircularProgress(ctx, width, height, root.opusWeeklyPercent)
+                    }
+                    property real _percent: root.opusWeeklyPercent
+                    on_PercentChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    Component.onCompleted: requestPaint()
+                }
+
+                PlasmaComponents.Label {
+                    anchors.centerIn: parent
+                    text: Math.round(root.opusWeeklyPercent)
+                    font.pixelSize: compactRoot.glyphFont
                     font.bold: true
                 }
             }
@@ -1242,6 +1296,8 @@ Item {
             parts.push(i18n.tr("Weekly (7day)") + ": " + Math.round(root.weeklyUsagePercent) + "%")
         if (Plasmoid.configuration.showSonnet === true)
             parts.push(i18n.tr("Sonnet") + ": " + Math.round(root.sonnetWeeklyPercent) + "%")
+        if (Plasmoid.configuration.showOpus === true)
+            parts.push(i18n.tr("Opus") + ": " + Math.round(root.opusWeeklyPercent) + "%")
         return parts.join(" | ")
     }
 }

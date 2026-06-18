@@ -20,6 +20,7 @@ KCM.SimpleKCM {
     property bool cfg_showSession
     property bool cfg_showWeekly
     property bool cfg_showSonnet
+    property bool cfg_showOpus
     property string cfg_baseUrl
     property string cfg_apiKey
     property double cfg_backgroundOpacity
@@ -132,6 +133,12 @@ KCM.SimpleKCM {
             text: tr("Sonnet")
             checked: cfg_showSonnet
             onCheckedChanged: cfg_showSonnet = checked
+        }
+
+        QQC2.CheckBox {
+            text: tr("Opus")
+            checked: cfg_showOpus
+            onCheckedChanged: cfg_showOpus = checked
         }
 
         RowLayout {
