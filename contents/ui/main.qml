@@ -465,6 +465,18 @@ Item {
             ? Kirigami.Units.gridUnit * 6
             : root.isVerticalLayout ? contentHeight : -1
 
+        // Custom background with configurable opacity (desktop only — on panels
+        // Plasma draws its own background via backgroundHints). Lives here, inside
+        // the representation that is actually placed in the scene, so it paints.
+        Rectangle {
+            anchors.fill: parent
+            z: -1
+            visible: !root.isOnPanel
+            color: Kirigami.Theme.backgroundColor
+            opacity: Plasmoid.configuration.backgroundOpacity
+            radius: Kirigami.Units.smallSpacing
+        }
+
         MouseArea {
             anchors.fill: parent
             onClicked: Plasmoid.expanded = !Plasmoid.expanded
@@ -1463,15 +1475,9 @@ Item {
         || Plasmoid.location === PlasmaCore.Types.RightEdge
 
     Plasmoid.backgroundHints: isOnPanel ? PlasmaCore.Types.DefaultBackground : PlasmaCore.Types.NoBackground
-
-    // Custom background with configurable opacity (desktop only)
-    Rectangle {
-        visible: !root.isOnPanel
-        anchors.fill: parent
-        color: Kirigami.Theme.backgroundColor
-        opacity: Plasmoid.configuration.backgroundOpacity
-        radius: Kirigami.Units.smallSpacing
-    }
+    // NOTE: the custom desktop background lives inside the compact representation
+    // (see compactRoot), because only the representation item is placed in the
+    // scene — a background rectangle parented to root here does not actually paint.
 
     Plasmoid.toolTipMainText: i18n.tr("Claude Usage")
     Plasmoid.toolTipSubText: {
