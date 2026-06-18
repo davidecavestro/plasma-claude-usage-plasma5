@@ -391,33 +391,78 @@ Item {
     Plasmoid.preferredRepresentation: Plasmoid.compactRepresentation
 
     Plasmoid.compactRepresentation: Item {
-        // Natural content footprint (used as-is on panels)
+        id: compactRoot
+
+        // Natural content footprint (used as-is on panels, where uiScale == 1)
         readonly property real contentWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
         readonly property real contentHeight: usageRow.implicitHeight + Kirigami.Units.largeSpacing * 2
 
-        // On the desktop, scale the whole indicator block up to fill the available
-        // space (preserving aspect ratio, never shrinking below natural size). On
-        // panels it stays at natural size. Driven by the live width/height, so it
-        // tracks user resizing. Uses contentWidth/Height (incl. padding) so the
-        // scaled content keeps a small margin from the edges.
-        readonly property real fillScale: root.isPlanar
-            && usageRow.implicitWidth > 0 && usageRow.implicitHeight > 0
-            ? Math.max(1, Math.min(width / contentWidth, height / contentHeight))
+        // Resolved style and which/how many metric indicators are shown
+        readonly property string styleResolved: Plasmoid.configuration.panelStyle || "text"
+        readonly property bool showIcon: Plasmoid.configuration.showIcon !== false
+        readonly property int metricCount:
+            (Plasmoid.configuration.showSession !== false ? 1 : 0)
+            + (Plasmoid.configuration.showWeekly !== false ? 1 : 0)
+            + (Plasmoid.configuration.showSonnet === true ? 1 : 0)
+            + (Plasmoid.configuration.showOpus === true ? 1 : 0)
+
+        // Base (unscaled) size of one metric indicator for the current style.
+        // "rings" overlays every metric into a single indicator, so it counts as 1.
+        readonly property real indBaseW: styleResolved === "circular" ? 28
+            : styleResolved === "rings" ? 36
+            : styleResolved === "bar" ? 32
+            : 10 + Kirigami.Units.smallSpacing + Kirigami.Theme.defaultFont.pixelSize * 2.6
+        readonly property real indBaseH: styleResolved === "circular" ? 28
+            : styleResolved === "rings" ? 36
+            : styleResolved === "bar" ? 28
+            : Math.max(10, Kirigami.Theme.defaultFont.pixelSize)
+        readonly property int indCount: styleResolved === "rings" ? 1 : Math.max(metricCount, 1)
+
+        // Natural footprint of the indicator row at scale 1, derived from CONSTANTS
+        // only (never from the live, scaled content) so uiScale below cannot feed
+        // back into itself and trigger a binding loop.
+        readonly property real baseRowWidth: {
+            var sp = Kirigami.Units.smallSpacing
+            var iconW = showIcon ? Kirigami.Units.iconSizes.smallMedium + sp : 0
+            if (root.isVerticalLayout)
+                return Math.max(showIcon ? Kirigami.Units.iconSizes.smallMedium : 0, indBaseW)
+            return iconW + indCount * indBaseW + (indCount - 1) * sp
+        }
+        readonly property real baseRowHeight: {
+            var sp = Kirigami.Units.smallSpacing / 2
+            var iconH = showIcon ? Kirigami.Units.iconSizes.smallMedium : 0
+            if (root.isVerticalLayout)
+                return (showIcon ? iconH + sp : 0) + indCount * indBaseH + (indCount - 1) * sp
+            return Math.max(iconH, indBaseH)
+        }
+
+        // Desktop only: scale every element (sizes AND fonts) up to fill the widget.
+        // This is resolution-independent — text and rings are re-laid-out/redrawn at
+        // the larger size rather than pixel-stretched, so they stay crisp. Loop-free:
+        // depends solely on the container geometry and the constant baseRow* metrics.
+        readonly property real uiScale: root.isPlanar && baseRowWidth > 0 && baseRowHeight > 0
+            ? Math.max(1, Math.min((width - Kirigami.Units.largeSpacing * 2) / baseRowWidth,
+                                   (height - Kirigami.Units.largeSpacing * 2) / baseRowHeight))
             : 1
 
-        // On the desktop, don't let the widget collapse to the panel's icon height —
-        // give it a readable minimum and a comfortable default size.
-        Layout.minimumWidth: root.isPlanar
-            ? Math.max(contentWidth, Kirigami.Units.gridUnit * 4)
-            : contentWidth
+        // Scaled metrics referenced throughout the indicator row
+        readonly property real iconSize: Kirigami.Units.iconSizes.smallMedium * uiScale
+        readonly property real dotSize: 10 * uiScale
+        readonly property real labelFont: Kirigami.Theme.defaultFont.pixelSize * uiScale
+        readonly property real glyphFont: 9 * uiScale
+        readonly property real ringSize: 28 * uiScale
+        readonly property real ringsSize: 36 * uiScale
+        readonly property real barWidth: 32 * uiScale
+
+        // Desktop footprint. Constants only (no dependency on scaled content), so
+        // uiScale — which reads width/height — has no path back to itself.
+        Layout.minimumWidth: root.isPlanar ? Kirigami.Units.gridUnit * 5 : contentWidth
         Layout.minimumHeight: root.isPlanar
-            ? Math.max(contentHeight, Kirigami.Units.gridUnit * 3)
+            ? Kirigami.Units.gridUnit * 3
             : root.isVerticalLayout ? contentHeight : Kirigami.Units.iconSizes.medium
-        Layout.preferredWidth: root.isPlanar
-            ? Math.max(contentWidth, Kirigami.Units.gridUnit * 6)
-            : contentWidth
+        Layout.preferredWidth: root.isPlanar ? Kirigami.Units.gridUnit * 8 : contentWidth
         Layout.preferredHeight: root.isPlanar
-            ? Math.max(contentHeight, Kirigami.Units.gridUnit * 4)
+            ? Kirigami.Units.gridUnit * 6
             : root.isVerticalLayout ? contentHeight : -1
 
         MouseArea {
@@ -428,8 +473,6 @@ Item {
         GridLayout {
             id: usageRow
             anchors.centerIn: parent
-            scale: parent.fillScale
-            transformOrigin: Item.Center
             columns: root.isVerticalLayout ? 1 : -1
             rows: root.isVerticalLayout ? -1 : 1
             flow: root.isVerticalLayout ? GridLayout.TopToBottom : GridLayout.LeftToRight
@@ -438,10 +481,10 @@ Item {
 
             // Claude icon with error indicator
             Item {
-                visible: Plasmoid.configuration.showIcon !== false
-                Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-                Layout.rightMargin: Kirigami.Units.smallSpacing
+                visible: compactRoot.showIcon
+                Layout.preferredWidth: compactRoot.iconSize
+                Layout.preferredHeight: compactRoot.iconSize
+                Layout.rightMargin: Kirigami.Units.smallSpacing * compactRoot.uiScale
 
                 Kirigami.Icon {
                     anchors.fill: parent
@@ -451,14 +494,14 @@ Item {
                 // Red dot for token/rate limit error
                 Rectangle {
                     visible: root.hasTokenError || root.hasRateLimitError
-                    width: 8
-                    height: 8
-                    radius: 4
+                    width: 8 * compactRoot.uiScale
+                    height: 8 * compactRoot.uiScale
+                    radius: width / 2
                     color: Kirigami.Theme.negativeTextColor
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
-                    anchors.rightMargin: -2
-                    anchors.bottomMargin: -2
+                    anchors.rightMargin: -2 * compactRoot.uiScale
+                    anchors.bottomMargin: -2 * compactRoot.uiScale
                 }
             }
 
@@ -466,7 +509,7 @@ Item {
             PlasmaComponents.Label {
                 visible: root.errorMsg !== "" && !root.hasTokenError && !root.hasRateLimitError
                 text: "⚠"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+                font.pixelSize: compactRoot.labelFont
                 color: Kirigami.Theme.negativeTextColor
             }
 
@@ -475,9 +518,9 @@ Item {
             // Session usage (text)
             Rectangle {
                 visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showSession !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 10
-                Layout.preferredHeight: 10
-                radius: 5
+                Layout.preferredWidth: compactRoot.dotSize
+                Layout.preferredHeight: compactRoot.dotSize
+                radius: compactRoot.dotSize / 2
                 color: getUsageColor(root.sessionUsagePercent)
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
             }
@@ -485,7 +528,7 @@ Item {
             PlasmaComponents.Label {
                 visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showSession !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
                 text: Math.round(root.sessionUsagePercent) + "%"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+                font.pixelSize: compactRoot.labelFont
                 font.bold: true
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
             }
@@ -495,15 +538,15 @@ Item {
                 visible: !root.isVerticalLayout && (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showSession !== false) && (Plasmoid.configuration.showWeekly !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
                 text: "|"
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.25 : root.isStale ? 0.35 : 0.5
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+                font.pixelSize: compactRoot.labelFont
             }
 
             // Weekly usage (text)
             Rectangle {
                 visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showWeekly !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 10
-                Layout.preferredHeight: 10
-                radius: 5
+                Layout.preferredWidth: compactRoot.dotSize
+                Layout.preferredHeight: compactRoot.dotSize
+                radius: compactRoot.dotSize / 2
                 color: getUsageColor(root.weeklyUsagePercent)
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
             }
@@ -511,7 +554,7 @@ Item {
             PlasmaComponents.Label {
                 visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showWeekly !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
                 text: Math.round(root.weeklyUsagePercent) + "%"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+                font.pixelSize: compactRoot.labelFont
                 font.bold: true
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
             }
@@ -521,15 +564,15 @@ Item {
                 visible: !root.isVerticalLayout && (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showSonnet === true) && ((Plasmoid.configuration.showSession !== false) || (Plasmoid.configuration.showWeekly !== false)) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
                 text: "|"
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.25 : root.isStale ? 0.35 : 0.5
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+                font.pixelSize: compactRoot.labelFont
             }
 
             // Sonnet usage (text)
             Rectangle {
                 visible: (!Plasmoid.configuration.panelStyle || Plasmoid.configuration.panelStyle === "text") && (Plasmoid.configuration.showSonnet === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 10
-                Layout.preferredHeight: 10
-                radius: 5
+                Layout.preferredWidth: compactRoot.dotSize
+                Layout.preferredHeight: compactRoot.dotSize
+                radius: compactRoot.dotSize / 2
                 color: getUsageColor(root.sonnetWeeklyPercent)
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
             }
@@ -547,8 +590,8 @@ Item {
             // Session (circular)
             Item {
                 visible: Plasmoid.configuration.panelStyle === "circular" && (Plasmoid.configuration.showSession !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 28
-                Layout.preferredHeight: 28
+                Layout.preferredWidth: compactRoot.ringSize
+                Layout.preferredHeight: compactRoot.ringSize
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
 
                 Canvas {
@@ -559,13 +602,15 @@ Item {
                     }
                     property real _percent: root.sessionUsagePercent
                     on_PercentChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
                     Component.onCompleted: requestPaint()
                 }
 
                 PlasmaComponents.Label {
                     anchors.centerIn: parent
                     text: Math.round(root.sessionUsagePercent)
-                    font.pixelSize: 9
+                    font.pixelSize: compactRoot.glyphFont
                     font.bold: true
                 }
             }
@@ -573,8 +618,8 @@ Item {
             // Weekly (circular)
             Item {
                 visible: Plasmoid.configuration.panelStyle === "circular" && (Plasmoid.configuration.showWeekly !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 28
-                Layout.preferredHeight: 28
+                Layout.preferredWidth: compactRoot.ringSize
+                Layout.preferredHeight: compactRoot.ringSize
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
 
                 Canvas {
@@ -585,13 +630,15 @@ Item {
                     }
                     property real _percent: root.weeklyUsagePercent
                     on_PercentChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
                     Component.onCompleted: requestPaint()
                 }
 
                 PlasmaComponents.Label {
                     anchors.centerIn: parent
                     text: Math.round(root.weeklyUsagePercent)
-                    font.pixelSize: 9
+                    font.pixelSize: compactRoot.glyphFont
                     font.bold: true
                 }
             }
@@ -599,8 +646,8 @@ Item {
             // Sonnet (circular)
             Item {
                 visible: Plasmoid.configuration.panelStyle === "circular" && (Plasmoid.configuration.showSonnet === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 28
-                Layout.preferredHeight: 28
+                Layout.preferredWidth: compactRoot.ringSize
+                Layout.preferredHeight: compactRoot.ringSize
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
 
                 Canvas {
@@ -611,6 +658,8 @@ Item {
                     }
                     property real _percent: root.sonnetWeeklyPercent
                     on_PercentChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
                     Component.onCompleted: requestPaint()
                 }
 
@@ -627,13 +676,13 @@ Item {
             // Session (bar)
             Item {
                 visible: Plasmoid.configuration.panelStyle === "bar" && (Plasmoid.configuration.showSession !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 32
+                Layout.preferredWidth: compactRoot.barWidth
                 Layout.preferredHeight: parent.height
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 3
+                    radius: 3 * compactRoot.uiScale
                     color: Kirigami.Theme.backgroundColor
                     border.color: Kirigami.Theme.disabledTextColor
                     border.width: 1
@@ -642,9 +691,9 @@ Item {
                         anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.margins: 1
-                        height: Math.max((parent.height - 2) * Math.min(root.sessionUsagePercent / 100, 1), 1)
-                        radius: 2
+                        anchors.margins: 1 * compactRoot.uiScale
+                        height: Math.max((parent.height - 2 * compactRoot.uiScale) * Math.min(root.sessionUsagePercent / 100, 1), 1)
+                        radius: 2 * compactRoot.uiScale
                         color: getUsageColor(root.sessionUsagePercent)
                     }
                 }
@@ -652,7 +701,7 @@ Item {
                 PlasmaComponents.Label {
                     anchors.centerIn: parent
                     text: Math.round(root.sessionUsagePercent)
-                    font.pixelSize: 9
+                    font.pixelSize: compactRoot.glyphFont
                     font.bold: true
                 }
             }
@@ -660,13 +709,13 @@ Item {
             // Weekly (bar)
             Item {
                 visible: Plasmoid.configuration.panelStyle === "bar" && (Plasmoid.configuration.showWeekly !== false) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 32
+                Layout.preferredWidth: compactRoot.barWidth
                 Layout.preferredHeight: parent.height
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 3
+                    radius: 3 * compactRoot.uiScale
                     color: Kirigami.Theme.backgroundColor
                     border.color: Kirigami.Theme.disabledTextColor
                     border.width: 1
@@ -675,9 +724,9 @@ Item {
                         anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.margins: 1
-                        height: Math.max((parent.height - 2) * Math.min(root.weeklyUsagePercent / 100, 1), 1)
-                        radius: 2
+                        anchors.margins: 1 * compactRoot.uiScale
+                        height: Math.max((parent.height - 2 * compactRoot.uiScale) * Math.min(root.weeklyUsagePercent / 100, 1), 1)
+                        radius: 2 * compactRoot.uiScale
                         color: getUsageColor(root.weeklyUsagePercent)
                     }
                 }
@@ -685,7 +734,7 @@ Item {
                 PlasmaComponents.Label {
                     anchors.centerIn: parent
                     text: Math.round(root.weeklyUsagePercent)
-                    font.pixelSize: 9
+                    font.pixelSize: compactRoot.glyphFont
                     font.bold: true
                 }
             }
@@ -693,13 +742,13 @@ Item {
             // Sonnet (bar)
             Item {
                 visible: Plasmoid.configuration.panelStyle === "bar" && (Plasmoid.configuration.showSonnet === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
-                Layout.preferredWidth: 32
+                Layout.preferredWidth: compactRoot.barWidth
                 Layout.preferredHeight: parent.height
                 opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 3
+                    radius: 3 * compactRoot.uiScale
                     color: Kirigami.Theme.backgroundColor
                     border.color: Kirigami.Theme.disabledTextColor
                     border.width: 1
@@ -708,9 +757,9 @@ Item {
                         anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.margins: 1
-                        height: Math.max((parent.height - 2) * Math.min(root.sonnetWeeklyPercent / 100, 1), 1)
-                        radius: 2
+                        anchors.margins: 1 * compactRoot.uiScale
+                        height: Math.max((parent.height - 2 * compactRoot.uiScale) * Math.min(root.sonnetWeeklyPercent / 100, 1), 1)
+                        radius: 2 * compactRoot.uiScale
                         color: getUsageColor(root.sonnetWeeklyPercent)
                     }
                 }
@@ -727,7 +776,7 @@ Item {
             PlasmaComponents.Label {
                 visible: root.errorMsg !== "" && !root.hasTokenError && !root.hasRateLimitError
                 text: root.errorMsg
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                font.pixelSize: Kirigami.Theme.smallFont.pixelSize * compactRoot.uiScale
                 color: Kirigami.Theme.negativeTextColor
             }
         }
@@ -1096,8 +1145,9 @@ Item {
     function drawCircularProgress(ctx, w, h, percent) {
         var centerX = w / 2
         var centerY = h / 2
-        var radius = Math.min(w, h) / 2 - 2
-        var lineWidth = 3
+        // Scale the stroke with the canvas so it stays proportional at any size
+        var lineWidth = Math.max(2, Math.min(w, h) / 9)
+        var radius = Math.min(w, h) / 2 - lineWidth / 2 - 1
         var startAngle = -Math.PI / 2
         var endAngle = startAngle + (2 * Math.PI * Math.min(percent, 100) / 100)
 
