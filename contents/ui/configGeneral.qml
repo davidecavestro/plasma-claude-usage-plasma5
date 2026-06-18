@@ -108,10 +108,13 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             Kirigami.FormData.label: tr("Style:")
-            model: [tr("Text"), tr("Circular"), tr("Bar")]
-            currentIndex: cfg_panelStyle === "circular" ? 1 : cfg_panelStyle === "bar" ? 2 : 0
+            model: [tr("Text"), tr("Circular"), tr("Bar"), tr("Nested rings")]
+            currentIndex: cfg_panelStyle === "circular" ? 1
+                : cfg_panelStyle === "bar" ? 2
+                : cfg_panelStyle === "rings" ? 3
+                : 0
             onCurrentIndexChanged: {
-                var styles = ["text", "circular", "bar"]
+                var styles = ["text", "circular", "bar", "rings"]
                 cfg_panelStyle = styles[currentIndex]
             }
         }

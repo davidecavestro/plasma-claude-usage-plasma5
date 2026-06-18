@@ -23,7 +23,7 @@
             <default>true</default>
         </entry>
         <entry name="panelStyle" type="String">
-            <label>Panel display style (text or circular)</label>
+            <label>Panel display style (text, circular, bar or rings)</label>
             <default>text</default>
         </entry>
         <entry name="showSession" type="Bool">

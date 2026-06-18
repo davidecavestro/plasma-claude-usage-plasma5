@@ -821,7 +821,151 @@ Item {
                 PlasmaComponents.Label {
                     anchors.centerIn: parent
                     text: Math.round(root.sonnetWeeklyPercent)
-                    font.pixelSize: 9
+                    font.pixelSize: compactRoot.glyphFont
+                    font.bold: true
+                }
+            }
+
+            // Opus (bar)
+            Item {
+                visible: Plasmoid.configuration.panelStyle === "bar" && (Plasmoid.configuration.showOpus === true) && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
+                Layout.preferredWidth: compactRoot.barWidth
+                Layout.preferredHeight: parent.height
+                opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 3 * compactRoot.uiScale
+                    color: Kirigami.Theme.backgroundColor
+                    border.color: Kirigami.Theme.disabledTextColor
+                    border.width: 1
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: 1 * compactRoot.uiScale
+                        height: Math.max((parent.height - 2 * compactRoot.uiScale) * Math.min(root.opusWeeklyPercent / 100, 1), 1)
+                        radius: 2 * compactRoot.uiScale
+                        color: getUsageColor(root.opusWeeklyPercent)
+                    }
+                }
+
+                PlasmaComponents.Label {
+                    anchors.centerIn: parent
+                    text: Math.round(root.opusWeeklyPercent)
+                    font.pixelSize: compactRoot.glyphFont
+                    font.bold: true
+                }
+            }
+
+            // === NESTED RINGS STYLE ===
+
+            // All enabled metrics drawn as concentric rings in a single indicator.
+            // Weekly is always the innermost ring so it hugs the Weekly number shown
+            // in the centre; the rest sit outside it (Session, Sonnet, Opus).
+            Item {
+                id: ringsItem
+                visible: compactRoot.styleResolved === "rings"
+                    && ((Plasmoid.configuration.showSession !== false)
+                        || (Plasmoid.configuration.showWeekly !== false)
+                        || (Plasmoid.configuration.showSonnet === true)
+                        || (Plasmoid.configuration.showOpus === true))
+                    && (root.errorMsg === "" || root.hasTokenError || root.hasRateLimitError)
+                Layout.preferredWidth: compactRoot.ringsSize
+                Layout.preferredHeight: compactRoot.ringsSize
+                opacity: (root.hasTokenError || root.hasRateLimitError) ? 0.5 : root.isStale ? 0.6 : 1.0
+
+                // Inner hole geometry — mirrors drawNestedRings() so the stacked
+                // numbers are sized to actually fit inside the innermost ring.
+                readonly property int ringCount: Math.max(compactRoot.metricCount, 1)
+                // Session/Sonnet sit in the (otherwise empty) square corners outside
+                // the ring circle, shown once the indicator is big enough to be legible.
+                readonly property bool showCorners: Math.min(width, height) >= 46
+                readonly property real cornerFont: Math.max(6, Math.min(width, height) * 0.16)
+                // When corner numbers are shown, pull the ring circle inward so the
+                // corner digits get a clear band and don't touch the outer ring.
+                readonly property real ringInset: showCorners ? cornerFont * 0.7 : 0
+                readonly property real ringSizePx: Math.min(width, height) - 2 * ringInset
+                readonly property real holeDiameter: {
+                    var sz = ringSizePx
+                    var lw = Math.max(2, sz / (ringCount * 3.2 + 2))
+                    var gap = lw * 0.55
+                    var hr = sz / 2 - lw - 1 - (ringCount - 1) * (lw + gap)
+                    return Math.max(0, hr * 2)
+                }
+                // Weekly fills the hole; shown only when a number fits there.
+                readonly property bool showCenterNumber: holeDiameter >= 14
+                readonly property real centerFont: Math.max(6, holeDiameter * 0.52)
+
+                Canvas {
+                    id: ringsCanvas
+                    anchors.fill: parent
+                    anchors.margins: ringsItem.ringInset
+                    onPaint: {
+                        var pcts = []
+                        if (Plasmoid.configuration.showSession !== false) pcts.push(root.sessionUsagePercent)
+                        if (Plasmoid.configuration.showSonnet === true) pcts.push(root.sonnetWeeklyPercent)
+                        if (Plasmoid.configuration.showOpus === true) pcts.push(root.opusWeeklyPercent)
+                        // Weekly drawn last → innermost ring, hugging the centred Weekly number
+                        if (Plasmoid.configuration.showWeekly !== false) pcts.push(root.weeklyUsagePercent)
+                        drawNestedRings(getContext("2d"), width, height, pcts)
+                    }
+                    // Repaint whenever any value, the visible-metric set, or the size changes
+                    property real _s: root.sessionUsagePercent
+                    property real _w: root.weeklyUsagePercent
+                    property real _o: root.sonnetWeeklyPercent
+                    property real _p: root.opusWeeklyPercent
+                    property int _mask: (Plasmoid.configuration.showSession !== false ? 1 : 0)
+                        | (Plasmoid.configuration.showWeekly !== false ? 2 : 0)
+                        | (Plasmoid.configuration.showSonnet === true ? 4 : 0)
+                        | (Plasmoid.configuration.showOpus === true ? 8 : 0)
+                    on_SChanged: requestPaint()
+                    on_WChanged: requestPaint()
+                    on_OChanged: requestPaint()
+                    on_PChanged: requestPaint()
+                    on_MaskChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    Component.onCompleted: requestPaint()
+                }
+
+                // Weekly % large in the centre hole; Session/Sonnet/Opus as small
+                // color-matched numbers tucked into the empty square corners
+                // (Session top-right, Sonnet bottom-right, Opus top-left).
+                PlasmaComponents.Label {
+                    visible: ringsItem.showCenterNumber && Plasmoid.configuration.showWeekly !== false
+                    anchors.centerIn: parent
+                    text: Math.round(root.weeklyUsagePercent)
+                    color: getUsageColor(root.weeklyUsagePercent)
+                    font.pixelSize: ringsItem.centerFont
+                    font.bold: true
+                }
+                PlasmaComponents.Label {
+                    visible: ringsItem.showCorners && Plasmoid.configuration.showSession !== false
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    text: Math.round(root.sessionUsagePercent)
+                    color: getUsageColor(root.sessionUsagePercent)
+                    font.pixelSize: ringsItem.cornerFont
+                    font.bold: true
+                }
+                PlasmaComponents.Label {
+                    visible: ringsItem.showCorners && Plasmoid.configuration.showSonnet === true
+                    anchors.bottom: parent.bottom
+                    anchors.right: parent.right
+                    text: Math.round(root.sonnetWeeklyPercent)
+                    color: getUsageColor(root.sonnetWeeklyPercent)
+                    font.pixelSize: ringsItem.cornerFont
+                    font.bold: true
+                }
+                PlasmaComponents.Label {
+                    visible: ringsItem.showCorners && Plasmoid.configuration.showOpus === true
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    text: Math.round(root.opusWeeklyPercent)
+                    color: getUsageColor(root.opusWeeklyPercent)
+                    font.pixelSize: ringsItem.cornerFont
                     font.bold: true
                 }
             }
@@ -1224,6 +1368,48 @@ Item {
             ctx.lineWidth = lineWidth
             ctx.lineCap = "round"
             ctx.stroke()
+        }
+    }
+
+    // Draw concentric rings (outer = first entry). Each metric gets a faint track
+    // plus a coloured progress arc; thickness and spacing scale with the canvas and
+    // with the number of rings, so it reads cleanly from panel size up to desktop.
+    function drawNestedRings(ctx, w, h, percents) {
+        ctx.reset()
+        var n = percents.length
+        if (n <= 0) return
+
+        var centerX = w / 2
+        var centerY = h / 2
+        var size = Math.min(w, h)
+        var lineWidth = Math.max(2, size / (n * 3.2 + 2))
+        var gap = lineWidth * 0.55
+        var outer = size / 2 - lineWidth / 2 - 1
+        var startAngle = -Math.PI / 2
+
+        for (var i = 0; i < n; i++) {
+            var radius = outer - i * (lineWidth + gap)
+            if (radius < lineWidth / 2) break
+
+            // Track
+            ctx.beginPath()
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI)
+            ctx.strokeStyle = Kirigami.Theme.disabledTextColor
+            ctx.globalAlpha = 0.25
+            ctx.lineWidth = lineWidth
+            ctx.stroke()
+
+            // Progress arc
+            var p = Math.min(percents[i], 100)
+            if (p > 0) {
+                ctx.beginPath()
+                ctx.arc(centerX, centerY, radius, startAngle, startAngle + 2 * Math.PI * p / 100)
+                ctx.strokeStyle = getUsageColor(percents[i])
+                ctx.globalAlpha = 1.0
+                ctx.lineWidth = lineWidth
+                ctx.lineCap = "round"
+                ctx.stroke()
+            }
         }
     }
 
