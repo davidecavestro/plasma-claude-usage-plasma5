@@ -379,12 +379,46 @@ Item {
 
     // Compact representation (panel)
     readonly property bool isVerticalLayout: Plasmoid.configuration.panelLayout === "vertical"
+    // On the desktop (Planar form factor) the widget is free-floating rather than
+    // constrained by a panel's thickness, so it needs explicit minimum sizes.
+    readonly property bool isPlanar: Plasmoid.formFactor === PlasmaCore.Types.Planar
+
+    // Always use the compact (styled) form inline, even on the desktop, so the
+    // Text/Circular/Bar style setting applies everywhere. Clicking still opens the
+    // full dashboard popup via the MouseArea below (toggles Plasmoid.expanded).
+    // Without this, the desktop falls back to the full representation, which always
+    // renders bars regardless of the configured style.
+    Plasmoid.preferredRepresentation: Plasmoid.compactRepresentation
 
     Plasmoid.compactRepresentation: Item {
-        Layout.minimumWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
-        Layout.minimumHeight: root.isVerticalLayout ? usageRow.implicitHeight + Kirigami.Units.largeSpacing * 2 : Kirigami.Units.iconSizes.medium
-        Layout.preferredWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
-        Layout.preferredHeight: root.isVerticalLayout ? usageRow.implicitHeight + Kirigami.Units.largeSpacing * 2 : -1
+        // Natural content footprint (used as-is on panels)
+        readonly property real contentWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
+        readonly property real contentHeight: usageRow.implicitHeight + Kirigami.Units.largeSpacing * 2
+
+        // On the desktop, scale the whole indicator block up to fill the available
+        // space (preserving aspect ratio, never shrinking below natural size). On
+        // panels it stays at natural size. Driven by the live width/height, so it
+        // tracks user resizing. Uses contentWidth/Height (incl. padding) so the
+        // scaled content keeps a small margin from the edges.
+        readonly property real fillScale: root.isPlanar
+            && usageRow.implicitWidth > 0 && usageRow.implicitHeight > 0
+            ? Math.max(1, Math.min(width / contentWidth, height / contentHeight))
+            : 1
+
+        // On the desktop, don't let the widget collapse to the panel's icon height —
+        // give it a readable minimum and a comfortable default size.
+        Layout.minimumWidth: root.isPlanar
+            ? Math.max(contentWidth, Kirigami.Units.gridUnit * 4)
+            : contentWidth
+        Layout.minimumHeight: root.isPlanar
+            ? Math.max(contentHeight, Kirigami.Units.gridUnit * 3)
+            : root.isVerticalLayout ? contentHeight : Kirigami.Units.iconSizes.medium
+        Layout.preferredWidth: root.isPlanar
+            ? Math.max(contentWidth, Kirigami.Units.gridUnit * 6)
+            : contentWidth
+        Layout.preferredHeight: root.isPlanar
+            ? Math.max(contentHeight, Kirigami.Units.gridUnit * 4)
+            : root.isVerticalLayout ? contentHeight : -1
 
         MouseArea {
             anchors.fill: parent
@@ -394,6 +428,8 @@ Item {
         GridLayout {
             id: usageRow
             anchors.centerIn: parent
+            scale: parent.fillScale
+            transformOrigin: Item.Center
             columns: root.isVerticalLayout ? 1 : -1
             rows: root.isVerticalLayout ? -1 : 1
             flow: root.isVerticalLayout ? GridLayout.TopToBottom : GridLayout.LeftToRight
